@@ -40,14 +40,17 @@ def find_new_entries(entries)
     # TollingTripPricing-I66/2019/02/17/20/02
     # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     existing_keys = []
-    if entries.first =~ /^(.*)\d+$/
+    if entries.first =~ /^(.*\/)\d+$/
         prefix = $1
         r = S3.list_objects_v2 :bucket => DATA_S3_BUCKET, :prefix => prefix
         puts r.inspect
         existing_keys = r.contents.map {|x| x.key }.sort.inspect
     end
-    puts existing_keys.inspect
-    entries.select {|e| !existing_keys.include? e }
+    puts "existing keys: #{existing_keys.inspect}"
+
+    new_keys = entries.select {|e| !existing_keys.include? e }
+    puts "new keys to write: #{new_keys.inspect}"
+    new_keys
 end
 
 def write_entry(entry)
@@ -71,6 +74,7 @@ end
 
 
 def handler(event:, context:)
+    puts "EVENT: #{JSON.generate(event)}"
     latest_hour_entries = find_latest_hour_entries
     new_entries = find_new_entries latest_hour_entries
     

@@ -15,6 +15,10 @@ Parameters:
     SmarterRoadsApiToken:
         Type: String
         Description: API token from smarterroads.org
+    ImportPeriodMinutes:
+        Type: Number
+        Description: Minutes between refresh attempts
+        Default: 15
 Resources:
     DataImportRole:
         Type: AWS::IAM::Role
@@ -58,3 +62,23 @@ Resources:
                 S3Bucket: !Ref S3ArtifactBucketName
                 S3Key: !Ref FunctionZipKey
             Timeout: 10
+
+    DataImportLambdaFunctionPermission:
+        Type: AWS::Lambda::Permission
+        Properties:
+            Action: lambda:InvokeFunction
+            FunctionName: !Ref DataImportLambdaFunction
+            Principal: events.amazonaws.com
+            SourceArn: !GetAtt ScheduledEventRule.Arn
+
+    ScheduledEventRule:
+        Type: AWS::Events::Rule
+        Properties:
+            Description: !Sub Look for new data every ${ImportPeriodMinutes} minutes
+            State: ENABLED
+            ScheduleExpression: !Sub rate(${ImportPeriodMinutes} minutes)
+            Targets:
+                - Arn: !GetAtt DataImportLambdaFunction.Arn
+                  Id: import-lambda-function
+
+
