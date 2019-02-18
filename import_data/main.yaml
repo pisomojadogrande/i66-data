@@ -6,13 +6,12 @@ Parameters:
     S3ArtifactBucketName:
         Type: String
         Description: Bucket where Lambda function code can be found
+    FunctionZipKey:
+        Type: String
+        Description: Key for the zipped function code under the artifacts S3 bucket
     S3DataBucketName:
         Type: String
         Description: Bucket to which data will be delivered
-    FunctionZipNameSuffix:
-        Type: String
-        Description: Suffix for the zip file name in the artifact bucket
-        Default: ""
     SmarterRoadsApiToken:
         Type: String
         Description: API token from smarterroads.org
@@ -57,4 +56,5 @@ Resources:
             Handler: import_data_function.handler
             Code:
                 S3Bucket: !Ref S3ArtifactBucketName
-                S3Key: !Sub function/import_data_function${FunctionZipNameSuffix}.zip
+                S3Key: !Ref FunctionZipKey
+            Timeout: 10
