@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: 'Scrapes for VDOT I-66 tolling data'
+
+Parameters:
+    S3ArtifactBucketName:
+        Type: String
+        Description: Bucket where Lambda function code can be found
+    S3DataBucketName:
+        Type: String
+        Description: Bucket to which data will be delivered
+    FunctionZipNameSuffix:
+        Type: String
+        Description: Suffix for the zip file name in the artifact bucket
+        Default: ""
+    SmarterRoadsApiToken:
+        Type: String
+        Description: API token from smarterroads.org
+Resources:
+    DataImportRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                    - Effect: Allow
+                      Principal:
+                          Service:
+                              - lambda.amazonaws.com
+                      Action:
+                          - sts:AssumeRole
+            ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+            Policies:
+                - PolicyName: S3BucketReadWrite
+                  PolicyDocument:
+                      Version: "2012-10-17"
+                      Statement:
+                          - Effect: Allow
+                            Action:
+                                - s3:GetObject
+                                - s3:ListBucket
+                                - s3:PutObject
+                            Resource: 
+                                - !Sub arn:aws:s3:::${S3DataBucketName}
+                                - !Sub arn:aws:s3:::${S3DataBucketName}/*
+
+    DataImportLambdaFunction:
+        Type: AWS::Lambda::Function
+        Properties:
+            Runtime: ruby2.5
+            Role: !GetAtt DataImportRole.Arn
+            Environment:
+                Variables:
+                    DATA_S3_BUCKET: !Ref S3DataBucketName
+                    SMARTER_ROADS_TOKEN: !Ref SmarterRoadsApiToken
+            Handler: import_data_function.handler
+            Code:
+                S3Bucket: !Ref S3ArtifactBucketName
+                S3Key: !Sub function/import_data_function${FunctionZipNameSuffix}.zip
