@@ -1,6 +1,9 @@
 require 'json'
 require 'net/http'
+require 'rexml/document'
 require 'aws-sdk-s3'
+
+include REXML
 
 S3 = Aws::S3::Client.new
 DATA_S3_BUCKET = ENV['DATA_S3_BUCKET']
@@ -63,8 +66,35 @@ def write_entry(entry)
     r = Net::HTTP.get_response download_uri
     puts "Data download result: #{r.inspect}"
 
-    puts "Writing to s3://#{DATA_S3_BUCKET}/#{entry}"
-    S3.put_object :bucket => DATA_S3_BUCKET, :key => entry, :body => r.body
+    # The Glue XML crawler doesn't seem to be able to reckon with
+    # this data, so we will convert it to CSV
+    # The data is formatted as 
+    # <data>
+    #   <opt CalculatedDateTime="2019-03-08T21:24:00Z" StartZoneName="Capital Beltway End" ... />
+    #   ... <opt />
+    # </data>
+    # Where the 'opt' rows contain the real data.
+    # Infer the schema from the first such row, and then write a CSV values row for each
+    xmldoc = Document.new r.body
+    row_elements = xmldoc.root.elements
+    if row_elements && !row_elements.empty?
+        attr_keys = row_elements.first.attributes.keys.sort
+        puts "Keys: #{attr_keys.inspect}"
+        csv_string = attr_keys.join ','
+        csv_string << "\n"
+
+        row_elements.each do |row_element|
+            csv_string << attr_keys.map { |k| row_element.attributes[k] }.join(',') << "\n"
+        end
+
+        puts "Writing to s3://#{DATA_S3_BUCKET}/#{entry}"
+        S3.put_object(
+            :bucket => DATA_S3_BUCKET,
+            :key => entry,
+            :content_type => 'text/plain; charset=utf-8',
+            :body => csv_string.encode('utf-8')
+        )
+    end
     entry
 end
 
